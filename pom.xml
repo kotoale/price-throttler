@@ -8,6 +8,12 @@
     <artifactId>price-throttler</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <scm>
+        <connection>scm:git:git@github.com:kotoale/price-throttler.git</connection>
+        <developerConnection>scm:git:git@github.com:kotoale/price-throttler.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
