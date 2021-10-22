@@ -1,5 +1,6 @@
 package com.price.processor;
 
+import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 class PriceThrottlerTest {
     private static final int CC_PAIRS_MAX_COUNT = 200;
     private static final int PROCESSORS_MAX_COUNT = 200;
+    private static final Offset<Double> EPSILON = Offset.offset(0.000001d);
 
     private PriceThrottler priceThrottler;
 
@@ -114,7 +116,7 @@ class PriceThrottlerTest {
         fastProcessors.forEach(processor -> {
             ArgumentCaptor<Double> captor = ArgumentCaptor.forClass(Double.class);
             Mockito.verify(processor, Mockito.atLeastOnce()).onPrice(eq("EURRUB"), captor.capture());
-            assertThat(captor.getAllValues()).last().isEqualTo(9999.0);
+            assertThat(captor.getAllValues().get(captor.getAllValues().size() - 1)).isEqualTo(9999.0, EPSILON);
         });
 
         // for unsubscribed processor
@@ -123,7 +125,7 @@ class PriceThrottlerTest {
         slowProcessors.stream().skip(1).forEach(processor -> {
             ArgumentCaptor<Double> captor = ArgumentCaptor.forClass(Double.class);
             Mockito.verify(processor, Mockito.atLeastOnce()).onPrice(eq("EURRUB"), captor.capture());
-            assertThat(captor.getAllValues()).last().isEqualTo(9999.0);
+            assertThat(captor.getAllValues().get(captor.getAllValues().size() - 1)).isEqualTo(9999.0, EPSILON);
         });
     }
 
