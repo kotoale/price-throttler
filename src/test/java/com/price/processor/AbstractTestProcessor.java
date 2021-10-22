@@ -15,10 +15,9 @@ public abstract class AbstractTestProcessor implements PriceProcessor {
             TimeUnit.MILLISECONDS.sleep(getProcessingTimeInMillis());
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
-            log.error("Process: {} has been interrupted", this, ie);
+            log.error("onPrice [ccyPair, rate]: [{}, {}] has been interrupted for {}", ccyPair, rate, this, ie);
         }
-        log.info("Price update [ccyPair, rate]: [{}, {}] successfully handled by processor: {}",
-                ccyPair, rate, this);
+        log.info("Price update [ccyPair, rate]: [{}, {}] successfully handled by {}", ccyPair, rate, this);
     }
 
     @Override
