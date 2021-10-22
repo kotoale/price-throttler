@@ -29,31 +29,33 @@ public class PriceThrottler implements PriceProcessor {
 
     @Override
     public void onPrice(String ccyPair, double rate) {
-        if (currencyToUpdatesProcessor.size() >= CC_PAIRS_MAX_COUNT) {
-            String errorMsg = "Can't process update for one more ccPair. The limit is reached, " +
-                    "limit: " + CC_PAIRS_MAX_COUNT;
-            log.error(errorMsg);
-            throw new IllegalStateException(errorMsg);
-        }
-
         priceTickHandler.execute(() -> {
-            final var ccyPairUpdatesProcessor = currencyToUpdatesProcessor.computeIfAbsent(ccyPair,
+            final var updatesProcessor = currencyToUpdatesProcessor.computeIfAbsent(
+                    ccyPair,
                     (key) -> {
-                        final var updatesProcessor = new CcyPairUpdatesProcessor(key, processorToExecutorService,
+                        if (currencyToUpdatesProcessor.size() >= CC_PAIRS_MAX_COUNT) {
+                            log.error("Skip update for [ccPair, rate]: [{}, {}]. The ccPairs limit is reached: {}",
+                                    key, rate, CC_PAIRS_MAX_COUNT);
+                            return null;
+                        }
+
+                        final var processor = new CcyPairUpdatesProcessor(key, processorToExecutorService,
                                 slowProcessorsExecutorService, fastProcessorsExecutorService,
                                 taskDurationThresholdInMillis);
-                        registeredProcessors.forEach(updatesProcessor::subscribe);
-                        return updatesProcessor;
-                    });
-            ccyPairUpdatesProcessor.onPrice(rate);
+                        registeredProcessors.forEach(processor::subscribe);
+                        return processor;
+                    }
+            );
+            if (updatesProcessor != null) {
+                updatesProcessor.onPrice(rate);
+            }
         });
     }
 
     @Override
     public void subscribe(PriceProcessor priceProcessor) {
         if (registeredProcessors.size() >= PROCESSORS_MAX_COUNT) {
-            String errorMsg = "Can't subscribe one more processor. The limit is reached, " +
-                    "limit: " + PROCESSORS_MAX_COUNT;
+            String errorMsg = "Can't subscribe one more processor. The processors limit is reached: " + PROCESSORS_MAX_COUNT;
             log.error(errorMsg);
             throw new IllegalStateException(errorMsg);
         }

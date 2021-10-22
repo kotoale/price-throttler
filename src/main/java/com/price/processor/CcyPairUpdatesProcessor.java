@@ -1,13 +1,12 @@
 package com.price.processor;
 
-import com.price.PriceRateHolder;
-import com.price.processor.wrapper.ProcessorWrappersFactory;
+import com.price.processor.wrapper.ProcessorWrapper;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 
-public class CcyPairUpdatesProcessor implements PriceProcessor {
+public class CcyPairUpdatesProcessor {
     private final String ccyPair;
     private final long taskDurationThresholdInMillis;
     private final ConcurrentMap<PriceProcessor, ExecutorService> processorToExecutorService;
@@ -25,33 +24,34 @@ public class CcyPairUpdatesProcessor implements PriceProcessor {
         this.taskDurationThresholdInMillis = taskDurationThresholdInMillis;
     }
 
-    @Override
-    public void onPrice(String ccyPair, double rate) {
-        onPrice(rate);
-    }
-
     public void onPrice(double rate) {
         processorToRateHolder.forEach((processor, priceRateHolder) -> {
             if (Double.isNaN(priceRateHolder.getAndSetRate(rate))) {
-                var executorServiceToBeUsed = processorToExecutorService.get(processor);
-                final boolean executorServiceNotSpecifiedForProcessor = executorServiceToBeUsed == null;
-                if (executorServiceNotSpecifiedForProcessor) {
-                    executorServiceToBeUsed = slowProcessorsExecutorService;
-                }
-                final var task = ProcessorWrappersFactory.buildProcessorWrapper(ccyPair, processor,
-                        priceRateHolder, taskDurationThresholdInMillis, executorServiceNotSpecifiedForProcessor,
-                        processorToExecutorService, slowProcessorsExecutorService, fastProcessorsExecutorService);
+                final var executorServiceToBeUsed = executorServiceToBeUsed(processor);
+                final var task = new ProcessorWrapper(ccyPair, processor, priceRateHolder,
+                        () -> executorServiceToBeUsed(processor), (time) -> calculateExecutorService(processor, time));
                 executorServiceToBeUsed.submit(task);
             }
         });
     }
 
-    @Override
+    private ExecutorService executorServiceToBeUsed(PriceProcessor priceProcessor) {
+        final var executorServiceToBeUsed = processorToExecutorService.get(priceProcessor);
+        return executorServiceToBeUsed == null ? slowProcessorsExecutorService : executorServiceToBeUsed;
+    }
+
+    private void calculateExecutorService(PriceProcessor processor, long taskDurationInMillis) {
+        processorToExecutorService.put(processor,
+                taskDurationInMillis <= taskDurationThresholdInMillis
+                        ? fastProcessorsExecutorService
+                        : slowProcessorsExecutorService
+        );
+    }
+
     public void subscribe(PriceProcessor priceProcessor) {
         processorToRateHolder.computeIfAbsent(priceProcessor, key -> new PriceRateHolder());
     }
 
-    @Override
     public void unsubscribe(PriceProcessor priceProcessor) {
         processorToRateHolder.remove(priceProcessor);
     }
