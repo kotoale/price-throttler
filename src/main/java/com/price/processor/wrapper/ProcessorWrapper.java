@@ -1,7 +1,7 @@
 package com.price.processor.wrapper;
 
-import com.price.processor.PriceEventHolder;
 import com.price.processor.PriceProcessor;
+import com.price.processor.PriceRateHolder;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -12,11 +12,11 @@ import java.util.function.Supplier;
 public class ProcessorWrapper implements Runnable {
     private final String ccyPair;
     private final PriceProcessor processor;
-    private final PriceEventHolder rateHolder;
+    private final PriceRateHolder rateHolder;
     private final Supplier<ExecutorService> executorServiceToBeUsed;
     private final Consumer<Long> processingTimeConsumer;
 
-    public ProcessorWrapper(String ccyPair, PriceProcessor processor, PriceEventHolder rateHolder,
+    public ProcessorWrapper(String ccyPair, PriceProcessor processor, PriceRateHolder rateHolder,
                             Supplier<ExecutorService> executorServiceToBeUsed, Consumer<Long> processingTimeConsumer) {
         this.ccyPair = ccyPair;
         this.processor = processor;
@@ -27,11 +27,11 @@ public class ProcessorWrapper implements Runnable {
 
     @Override
     public void run() {
-        final var event = rateHolder.getEvent();
+        final var rate = rateHolder.getRate();
         Instant start = Instant.now();
-        processor.onPrice(ccyPair, event.getRate());
+        processor.onPrice(ccyPair, rate);
         processingTimeConsumer.accept(ChronoUnit.MILLIS.between(start, Instant.now()));
-        if (!rateHolder.compareAndSet(event, null)) {
+        if (!rateHolder.compareAndSetNull(rate)) {
             executorServiceToBeUsed.get().submit(this);
         }
     }

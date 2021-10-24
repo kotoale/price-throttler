@@ -12,7 +12,7 @@ public class CcyPairUpdatesProcessor {
     private final ConcurrentMap<PriceProcessor, ExecutorService> processorToExecutorService;
     private final ExecutorService slowProcessorsExecutorService;
     private final ExecutorService fastProcessorsExecutorService;
-    private final ConcurrentHashMap<PriceProcessor, PriceEventHolder> processorToEventHolder = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<PriceProcessor, PriceRateHolder> processorToRateHolder = new ConcurrentHashMap<>();
 
     public CcyPairUpdatesProcessor(String ccyPair, ConcurrentMap<PriceProcessor, ExecutorService> processorToExecutorService,
                                    ExecutorService slowProcessorsExecutorService, ExecutorService fastProcessorsExecutorService,
@@ -25,10 +25,10 @@ public class CcyPairUpdatesProcessor {
     }
 
     public void onPrice(double rate) {
-        processorToEventHolder.forEach((processor, priceEventHolder) -> {
-            if (priceEventHolder.getAndSetRate(rate) == null) {
+        processorToRateHolder.forEach((processor, priceRateHolder) -> {
+            if (priceRateHolder.setAndCheckIfItWasNull(rate)) {
                 final var executorServiceToBeUsed = executorServiceToBeUsed(processor);
-                final var task = new ProcessorWrapper(ccyPair, processor, priceEventHolder,
+                final var task = new ProcessorWrapper(ccyPair, processor, priceRateHolder,
                         () -> executorServiceToBeUsed(processor), (time) -> calculateExecutorService(processor, time));
                 executorServiceToBeUsed.submit(task);
             }
@@ -49,10 +49,10 @@ public class CcyPairUpdatesProcessor {
     }
 
     public void subscribe(PriceProcessor priceProcessor) {
-        processorToEventHolder.computeIfAbsent(priceProcessor, key -> new PriceEventHolder());
+        processorToRateHolder.computeIfAbsent(priceProcessor, key -> new PriceRateHolder());
     }
 
     public void unsubscribe(PriceProcessor priceProcessor) {
-        processorToEventHolder.remove(priceProcessor);
+        processorToRateHolder.remove(priceProcessor);
     }
 }
