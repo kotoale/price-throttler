@@ -12,7 +12,7 @@ public class CcyPairUpdatesProcessor {
     private final ConcurrentMap<PriceProcessor, ExecutorService> processorToExecutorService;
     private final ExecutorService slowProcessorsExecutorService;
     private final ExecutorService fastProcessorsExecutorService;
-    private final ConcurrentHashMap<PriceProcessor, PriceRateHolder> processorToRateHolder = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<PriceProcessor, PriceEventHolder> processorToEventHolder = new ConcurrentHashMap<>();
 
     public CcyPairUpdatesProcessor(String ccyPair, ConcurrentMap<PriceProcessor, ExecutorService> processorToExecutorService,
                                    ExecutorService slowProcessorsExecutorService, ExecutorService fastProcessorsExecutorService,
@@ -25,10 +25,10 @@ public class CcyPairUpdatesProcessor {
     }
 
     public void onPrice(double rate) {
-        processorToRateHolder.forEach((processor, priceRateHolder) -> {
-            if (Double.isNaN(priceRateHolder.getAndSetRate(rate))) {
+        processorToEventHolder.forEach((processor, priceEventHolder) -> {
+            if (priceEventHolder.getAndSetRate(rate) == null) {
                 final var executorServiceToBeUsed = executorServiceToBeUsed(processor);
-                final var task = new ProcessorWrapper(ccyPair, processor, priceRateHolder,
+                final var task = new ProcessorWrapper(ccyPair, processor, priceEventHolder,
                         () -> executorServiceToBeUsed(processor), (time) -> calculateExecutorService(processor, time));
                 executorServiceToBeUsed.submit(task);
             }
@@ -49,10 +49,10 @@ public class CcyPairUpdatesProcessor {
     }
 
     public void subscribe(PriceProcessor priceProcessor) {
-        processorToRateHolder.computeIfAbsent(priceProcessor, key -> new PriceRateHolder());
+        processorToEventHolder.computeIfAbsent(priceProcessor, key -> new PriceEventHolder());
     }
 
     public void unsubscribe(PriceProcessor priceProcessor) {
-        processorToRateHolder.remove(priceProcessor);
+        processorToEventHolder.remove(priceProcessor);
     }
 }
